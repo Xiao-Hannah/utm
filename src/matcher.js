@@ -61,7 +61,7 @@ export async function matchSignups() {
           Boolean(user.signup_email_verified)
         ]
       );
-      if (result.affectedRows === 1) {
+      if (result.affectedRows === 1 && result.insertId) {
         matched += 1;
       }
     }

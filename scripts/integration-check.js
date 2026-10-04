@@ -175,11 +175,25 @@ try {
     throw new Error(`Unexpected matcher output: ${matchOutput}`);
   }
 
-  const [[result]] = await connection.query(
-    "SELECT COUNT(*) AS conversions FROM referral_conversions"
+  const secondMatchOutput = run(process.execPath, ["src/run-matcher.js"], { env: environment });
+  if (!secondMatchOutput.includes("matched 0 conversions")) {
+    throw new Error(`Matcher was not idempotent: ${secondMatchOutput}`);
+  }
+
+  await connection.execute(
+    "UPDATE backend_userprofile SET is_email_verified = FALSE WHERE utm_campaign = ?",
+    [ambassador.code]
   );
-  if (Number(result.conversions) !== 1) {
-    throw new Error(`Expected one conversion, found ${result.conversions}`);
+  run(process.execPath, ["src/run-matcher.js"], { env: environment });
+
+  const [[result]] = await connection.query(
+    `SELECT COUNT(*) AS conversions, SUM(email_verified) AS verified
+     FROM referral_conversions`
+  );
+  if (Number(result.conversions) !== 1 || Number(result.verified) !== 0) {
+    throw new Error(
+      `Expected one unverified conversion, found ${result.conversions} conversions and ${result.verified} verified`
+    );
   }
 
   console.log(
